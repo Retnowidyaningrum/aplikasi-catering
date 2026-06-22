@@ -1,0 +1,48 @@
+# Cateringku - .gitignore
+
+# OS Files
+Thumbs.db
+.DS_Store
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# PHP
+*.log
+*.cache
+error_log
+
+# Python (AGENT.py related)
+__pycache__/
+*.pyc
+*.pyo
+agent_v3_audit.log
+
+# Uploads (user generated content)
+/uploads/menus/*
+/uploads/payments/*
+!/uploads/menus/.gitkeep
+!/uploads/payments/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+netbeans/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+/logs/
+
+# XAMPP specific
+xampp/

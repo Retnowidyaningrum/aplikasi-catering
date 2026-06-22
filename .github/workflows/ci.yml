@@ -1,0 +1,70 @@
+name: Cateringku CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  php-lint:
+    name: PHP Syntax Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: none
+
+      - name: PHP Syntax Check (all .php files)
+        run: |
+          error=0
+          while IFS= read -r -d '' file; do
+            echo "Checking: $file"
+            if ! php -l "$file" 2>&1; then
+              error=1
+            fi
+          done < <(find . -name '*.php' -not -path './.github/*' -print0)
+          if [ $error -eq 1 ]; then
+            echo "❌ PHP syntax errors found!"
+            exit 1
+          fi
+          echo "✅ All PHP files passed syntax check!"
+
+  security-check:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded credentials
+        run: |
+          echo "🔍 Scanning for hardcoded credentials..."
+          issues=0
+          # Check for mysql_* functions (deprecated)
+          if grep -rn "mysql_\b" --include="*.php" . 2>/dev/null; then
+            echo "❌ Found deprecated mysql_* functions!"
+            issues=1
+          fi
+          # Check for eval()
+          if grep -rn "\beval\b" --include="*.php" . 2>/dev/null; then
+            echo "❌ Found eval() usage!"
+            issues=1
+          fi
+          # Check for shell_exec/exec/system
+          if grep -rn "\b\(shell_exec\|exec\|system\|popen\)\b" --include="*.php" . 2>/dev/null; then
+            echo "❌ Found dangerous function usage!"
+            issues=1
+          fi
+          if [ $issues -eq 1 ]; then
+            echo "❌ Security issues found!"
+            exit 1
+          fi
+          echo "✅ Security scan passed!"
