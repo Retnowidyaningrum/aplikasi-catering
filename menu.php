@@ -5,6 +5,8 @@ include 'config/database.php';
 
 // ========== PROSES TAMBAH MENU ==========
 if(isset($_POST['tambah'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
+    
     $price = str_replace('.', '', $_POST['price']);
     
     // Upload gambar
@@ -13,12 +15,20 @@ if(isset($_POST['tambah'])) {
         $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         $filename = $_FILES['image']['name'];
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $maxSize = 2 * 1024 * 1024; // 2MB
         
-        if(in_array($ext, $allowed)) {
-            $imageName = time() . '_' . uniqid() . '.' . $ext;
-            $uploadPath = __DIR__ . '/uploads/menus/' . $imageName;
-            move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath);
+        if(!in_array($ext, $allowed)) {
+            echo "<script>alert('Format file tidak didukung! (JPG, PNG, WEBP, GIF)'); location.href='menu.php';</script>";
+            exit();
         }
+        if($_FILES['image']['size'] > $maxSize) {
+            echo "<script>alert('Ukuran file maksimal 2MB!'); location.href='menu.php';</script>";
+            exit();
+        }
+        
+        $imageName = time() . '_' . uniqid() . '.' . $ext;
+        $uploadPath = __DIR__ . '/uploads/menus/' . $imageName;
+        move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath);
     }
     
     $stmt = $db->prepare("INSERT INTO menus (name, category, price, image) VALUES (?,?,?,?)");
@@ -28,6 +38,7 @@ if(isset($_POST['tambah'])) {
 
 // ========== PROSES EDIT MENU ==========
 if(isset($_POST['edit'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
     $price = str_replace('.', '', $_POST['price']);
     
     // Ambil data menu lama
@@ -42,17 +53,25 @@ if(isset($_POST['edit'])) {
         $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         $filename = $_FILES['image']['name'];
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $maxSize = 2 * 1024 * 1024;
         
-        if(in_array($ext, $allowed)) {
-            // Hapus gambar lama jika ada
-            if($oldImage && file_exists(__DIR__ . '/uploads/menus/' . $oldImage)) {
-                unlink(__DIR__ . '/uploads/menus/' . $oldImage);
-            }
-            
-            $imageName = time() . '_' . uniqid() . '.' . $ext;
-            $uploadPath = __DIR__ . '/uploads/menus/' . $imageName;
-            move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath);
+        if(!in_array($ext, $allowed)) {
+            echo "<script>alert('Format file tidak didukung!'); location.href='menu.php';</script>";
+            exit();
         }
+        if($_FILES['image']['size'] > $maxSize) {
+            echo "<script>alert('Ukuran file maksimal 2MB!'); location.href='menu.php';</script>";
+            exit();
+        }
+        
+        // Hapus gambar lama jika ada
+        if($oldImage && file_exists(__DIR__ . '/uploads/menus/' . $oldImage)) {
+            unlink(__DIR__ . '/uploads/menus/' . $oldImage);
+        }
+        
+        $imageName = time() . '_' . uniqid() . '.' . $ext;
+        $uploadPath = __DIR__ . '/uploads/menus/' . $imageName;
+        move_uploaded_file($_FILES['image']['tmp_name'], $uploadPath);
     }
     
     $stmt = $db->prepare("UPDATE menus SET name=?, category=?, price=?, image=? WHERE id=?");
@@ -62,6 +81,10 @@ if(isset($_POST['edit'])) {
 
 // ========== PROSES HAPUS MENU ==========
 if(isset($_GET['hapus'])) {
+    if (!isset($_GET['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_GET['csrf_token'])) {
+        die('Token CSRF tidak valid!');
+    }
+    
     // Ambil nama gambar
     $getImage = $db->prepare("SELECT image FROM menus WHERE id = ?");
     $getImage->execute([$_GET['hapus']]);
@@ -208,7 +231,7 @@ $menus = $db->query("SELECT * FROM menus ORDER BY id DESC")->fetchAll();
                                         )">
                                             <i class="fas fa-edit"></i> Edit
                                         </button>
-                                        <a href="?hapus=<?= $m['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus menu <?= addslashes($m['name']) ?>?')">
+                                        <a href="?hapus=<?= $m['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus menu <?= addslashes($m['name']) ?>?')">
                                             <i class="fas fa-trash"></i> Hapus
                                         </a>
                                     </div>
@@ -237,6 +260,7 @@ $menus = $db->query("SELECT * FROM menus ORDER BY id DESC")->fetchAll();
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" enctype="multipart/form-data">
+                <?= csrfField() ?>
                 <div class="modal-header" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white;">
                     <h5 class="modal-title"><i class="fas fa-plus"></i> Tambah Menu Baru</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -286,6 +310,7 @@ $menus = $db->query("SELECT * FROM menus ORDER BY id DESC")->fetchAll();
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" enctype="multipart/form-data">
+                <?= csrfField() ?>
                 <input type="hidden" name="id" id="edit_id">
                 <input type="hidden" name="old_image" id="edit_old_image">
                 <div class="modal-header bg-warning text-dark">

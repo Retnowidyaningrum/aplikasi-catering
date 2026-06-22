@@ -9,6 +9,11 @@ if (defined('DB_LOADED')) {
 }
 define('DB_LOADED', true);
 
+// Session untuk CSRF & login (hanya jika belum mulai)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $host = 'localhost';
 $dbname = 'catering_db';
 $user = 'root';
@@ -25,6 +30,9 @@ try {
 } catch(PDOException $e) {
     die("Koneksi gagal: " . $e->getMessage());
 }
+
+// Helper functions
+include __DIR__ . '/../inc/helpers.php';
 
 // Fungsi rp dengan pengecekan
 if (!function_exists('rp')) {

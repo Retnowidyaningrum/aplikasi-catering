@@ -12,6 +12,8 @@ if(isset($_GET['invoice'])) {
 }
 
 if(isset($_POST['confirm'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
+    
     $invoice = $_POST['invoice'];
     
     // Buat folder jika belum ada
@@ -21,20 +23,29 @@ if(isset($_POST['confirm'])) {
     }
     
     if(isset($_FILES['proof']) && $_FILES['proof']['error'] == 0) {
+        $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         $ext = strtolower(pathinfo($_FILES['proof']['name'], PATHINFO_EXTENSION));
-        $newName = time() . '_' . rand(1000,9999) . '.' . $ext;
-        $uploadPath = $uploadDir . $newName;
+        $maxSize = 2 * 1024 * 1024; // 2MB
         
-        if(move_uploaded_file($_FILES['proof']['tmp_name'], $uploadPath)) {
-            $update = $db->prepare("UPDATE orders SET payment_proof = ?, payment_confirmed = 1, payment_confirmed_at = NOW() WHERE invoice_no = ?");
-            $update->execute([$newName, $invoice]);
-            $message = "Bukti transfer berhasil dikirim!";
-            
-            // Redirect ke tracking
-            header("Location: tracking.php?invoice=" . $invoice);
-            exit();
+        if(!in_array($ext, $allowed)) {
+            $message = "Format file tidak didukung! (JPG, PNG, WEBP, GIF)";
+        } elseif($_FILES['proof']['size'] > $maxSize) {
+            $message = "Ukuran file maksimal 2MB!";
         } else {
-            $message = "Gagal upload file!";
+            $newName = time() . '_' . rand(1000,9999) . '.' . $ext;
+            $uploadPath = $uploadDir . $newName;
+            
+            if(move_uploaded_file($_FILES['proof']['tmp_name'], $uploadPath)) {
+                $update = $db->prepare("UPDATE orders SET payment_proof = ?, payment_confirmed = 1, payment_confirmed_at = NOW() WHERE invoice_no = ?");
+                $update->execute([$newName, $invoice]);
+                $message = "Bukti transfer berhasil dikirim!";
+                
+                // Redirect ke tracking
+                header("Location: tracking.php?invoice=" . $invoice);
+                exit();
+            } else {
+                $message = "Gagal upload file!";
+            }
         }
     } else {
         $message = "Pilih file terlebih dahulu!";
@@ -67,10 +78,12 @@ if(isset($_POST['confirm'])) {
                     <strong>Bank BCA:</strong> 1234 5678 9012 3456 a.n. Cateringku
                 </div>
                 <form method="POST" enctype="multipart/form-data">
+                    <?= csrfField() ?>
                     <input type="hidden" name="invoice" value="<?= $order['invoice_no'] ?>">
                     <div class="mb-3">
                         <label>Upload Bukti Transfer</label>
-                        <input type="file" name="proof" class="form-control" required>
+                        <input type="file" name="proof" class="form-control" required accept="image/jpeg,image/png,image/webp,image/gif">
+                        <small class="text-muted">Format: JPG, PNG, WEBP, GIF. Maksimal 2MB.</small>
                     </div>
                     <button type="submit" name="confirm" class="btn btn-success w-100">Kirim</button>
                 </form>

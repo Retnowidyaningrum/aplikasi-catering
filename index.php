@@ -3,28 +3,50 @@ session_start();
 include 'config/database.php';
 
 if(isset($_POST['login'])) {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-    
-    $stmt = $db->prepare("SELECT * FROM users WHERE username=? AND password=?");
-    $stmt->execute([$username, $password]);
-    $user = $stmt->fetch();
-    
-    if($user) {
-        $_SESSION['login'] = true;
-        $_SESSION['user'] = $username;
-        header('Location: dashboard.php');
-        exit();
+    if (!verifyCsrfToken()) {
+        $error = "Token CSRF tidak valid!";
     } else {
+        $username = $_POST['username'];
+        $password = $_POST['password'];
+        
+        $stmt = $db->prepare("SELECT * FROM users WHERE username=?");
+        $stmt->execute([$username]);
+        $user = $stmt->fetch();
+        
+        if ($user) {
+            // Cek dengan password_verify dulu
+            if (password_verify($password, $user['password'])) {
+                $_SESSION['login'] = true;
+                $_SESSION['user'] = $username;
+                header('Location: dashboard.php');
+                exit();
+            }
+            
+            // Fallback: cek plaintext (untuk user lama) dan auto-migrate ke hash
+            $stmtPlain = $db->prepare("SELECT * FROM users WHERE username=? AND password=?");
+            $stmtPlain->execute([$username, $password]);
+            $userPlain = $stmtPlain->fetch();
+            if ($userPlain) {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                $update = $db->prepare("UPDATE users SET password=? WHERE id=?");
+                $update->execute([$hash, $userPlain['id']]);
+                $_SESSION['login'] = true;
+                $_SESSION['user'] = $username;
+                header('Location: dashboard.php');
+                exit();
+            }
+        }
+        
         $error = "Username atau password salah!";
     }
 }
 
 // Proses reset password (demo - hanya menampilkan pesan)
 if(isset($_POST['reset_password'])) {
-    $reset_email = $_POST['reset_email'];
-    // Demo: hanya menampilkan alert
-    echo "<script>alert('Link reset password telah dikirim ke $reset_email\\n\\nUsername: admin\\nPassword: admin123');</script>";
+    if (verifyCsrfToken()) {
+        $reset_email = $_POST['reset_email'];
+        echo "<script>alert('Link reset password telah dikirim ke $reset_email\\n\\nUsername: admin\\nPassword: admin123');</script>";
+    }
 }
 
 if(isset($_SESSION['login'])) {
@@ -263,6 +285,7 @@ if(isset($_SESSION['login'])) {
     <?php endif; ?>
     
     <form method="POST">
+        <?= csrfField() ?>
         <div class="form-group">
             <label><i class="fas fa-user"></i> Username</label>
             <input type="text" name="username" class="form-control" placeholder="Masukkan username" required autofocus>
@@ -302,6 +325,7 @@ if(isset($_SESSION['login'])) {
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST">
+                <?= csrfField() ?>
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-key"></i> Reset Password</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

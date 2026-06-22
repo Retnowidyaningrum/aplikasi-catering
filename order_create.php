@@ -1,13 +1,14 @@
 <?php
-session_start();
-if(!isset($_SESSION['login'])) header('Location: index.php');
 include 'config/database.php';
+if(!isset($_SESSION['login'])) header('Location: index.php');
 
 // PERUBAHAN: Hapus WHERE stock > 0
 $menus = $db->query("SELECT * FROM menus ORDER BY name ASC")->fetchAll();
 $customers = $db->query("SELECT id, name, phone, address FROM customers ORDER BY name ASC")->fetchAll();
 
 if(isset($_POST['simpan'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
+    
     $customer_id = $_POST['customer_id'];
     $order_date = $_POST['order_date'];
     $delivery_date = $_POST['delivery_date'];
@@ -16,11 +17,12 @@ if(isset($_POST['simpan'])) {
     $notes = $_POST['notes'];
     $menu_ids = $_POST['menu_id'];
     $qtys = $_POST['qty'];
+    $payment_method = $_POST['payment_method'] ?? 'cod';
     
     $invoice = 'INV/' . date('Ymd') . '/' . rand(100,999);
     
-    $stmt = $db->prepare("INSERT INTO orders (invoice_no, customer_id, order_date, delivery_date, delivery_fee, total, notes, status) VALUES (?,?,?,?,?,?,?, 'pending')");
-    $stmt->execute([$invoice, $customer_id, $order_date, $delivery_date, $delivery_fee, $total, $notes]);
+    $stmt = $db->prepare("INSERT INTO orders (invoice_no, customer_id, order_date, delivery_date, delivery_fee, payment_method, total, notes, status) VALUES (?,?,?,?,?,?,?,?, 'pending')");
+    $stmt->execute([$invoice, $customer_id, $order_date, $delivery_date, $delivery_fee, $payment_method, $total, $notes]);
     $order_id = $db->lastInsertId();
     
     for($i = 0; $i < count($menu_ids); $i++) {
@@ -163,6 +165,7 @@ if(isset($_POST['simpan'])) {
     </div>
     
     <form method="POST" id="orderForm">
+        <?= csrfField() ?>
         <div class="row">
             <div class="col-md-5">
                 <!-- Data Pelanggan -->
@@ -219,6 +222,29 @@ if(isset($_POST['simpan'])) {
                         </div>
                     </div>
                 </div>
+                
+                <!-- Metode Pembayaran -->
+                <div class="card">
+                    <div class="card-header-custom"><i class="fas fa-credit-card"></i> Metode Pembayaran</div>
+                    <div class="card-body">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="payment_method" id="payment_cod" value="cod" checked>
+                            <label class="form-check-label fw-bold" for="payment_cod">
+                                <i class="fas fa-money-bill-wave"></i> COD (Bayar di Tempat)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="payment_method" id="payment_transfer" value="transfer">
+                            <label class="form-check-label fw-bold" for="payment_transfer">
+                                <i class="fas fa-university"></i> Transfer Bank
+                            </label>
+                        </div>
+                        <div id="bankInfo" class="alert alert-warning mt-2 py-2" style="display: none; font-size: 12px;">
+                            <i class="fas fa-info-circle"></i> <strong>Bank BCA</strong> - 1234 5678 9012 3456 a.n. Cateringku
+                        </div>
+                    </div>
+                </div>
+            
             </div>
             
             <div class="col-md-7">
@@ -284,6 +310,7 @@ if(isset($_POST['simpan'])) {
                             </tr>
                         </table>
                         <input type="hidden" name="total" id="totalHidden">
+                        <input type="hidden" name="payment_method" id="paymentMethod" value="cod">
                         <button type="submit" name="simpan" class="btn-simpan mt-3" id="simpanBtn" disabled>
                             <i class="fas fa-save"></i> Simpan Pesanan
                         </button>
@@ -472,6 +499,20 @@ document.getElementById('orderForm').addEventListener('submit', function(e) {
         e.preventDefault();
         alert('Tambah menu ke keranjang!');
     }
+});
+
+// Payment method toggle
+document.querySelectorAll('input[name="payment_method"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        var bankInfo = document.getElementById('bankInfo');
+        if(this.value === 'transfer') {
+            bankInfo.style.display = 'block';
+            document.getElementById('paymentMethod').value = 'transfer';
+        } else {
+            bankInfo.style.display = 'none';
+            document.getElementById('paymentMethod').value = 'cod';
+        }
+    });
 });
 </script>
 </body>

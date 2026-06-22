@@ -8,6 +8,8 @@ $MIN_ORDER_GRATIS = 500000;
 $menus = $db->query("SELECT * FROM menus ORDER BY name ASC")->fetchAll();
 
 if(isset($_POST['simpan'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
+    
     // Simpan data pelanggan
     $cekCustomer = $db->prepare("SELECT id FROM customers WHERE phone = ?");
     $cekCustomer->execute([$_POST['customer_phone']]);
@@ -308,6 +310,7 @@ $selected_menu_id = isset($_GET['menu_id']) ? $_GET['menu_id'] : null;
     <h3 class="text-center mb-4"><i class="fas fa-shopping-cart"></i> Form Pemesanan</h3>
     
     <form method="POST" id="orderForm">
+        <?= csrfField() ?>
         <div class="card">
             <div class="card-header"><i class="fas fa-user"></i> Data Diri <span class="text-danger">*Wajib diisi</span></div>
             <div class="card-body">

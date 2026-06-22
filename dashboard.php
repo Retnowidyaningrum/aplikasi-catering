@@ -9,18 +9,7 @@ $total_order = $db->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 $pending = $db->query("SELECT COUNT(*) FROM orders WHERE status='pending'")->fetchColumn();
 $orders = $db->query("SELECT o.*, c.name as customer_name FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ORDER BY o.id DESC LIMIT 5")->fetchAll();
 
-// Fungsi untuk mendapatkan badge status dalam Bahasa Indonesia
-function getStatusBadge($status) {
-    if($status == 'pending') {
-        return '<span class="badge-pending"><i class="fas fa-clock"></i> Pending</span>';
-    } elseif($status == 'processing') {
-        return '<span class="badge-processing"><i class="fas fa-cog"></i> Diproses</span>';
-    } elseif($status == 'completed') {
-        return '<span class="badge-completed"><i class="fas fa-check"></i> Selesai</span>';
-    } else {
-        return '<span class="badge-cancelled"><i class="fas fa-times"></i> Dibatalkan</span>';
-    }
-}
+// Badge status menggunakan fungsi sentral dari inc/helpers.php
 ?>
 <!DOCTYPE html>
 <html lang="id">

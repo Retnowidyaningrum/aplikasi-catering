@@ -6,6 +6,8 @@ $order = null;
 $items = [];
 
 if(isset($_POST['cek'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
+    
     $invoice = $_POST['invoice'];
     
     $stmt = $db->prepare("SELECT o.*, c.name as customer_name, c.phone, c.address 
@@ -24,43 +26,7 @@ if(isset($_POST['cek'])) {
     }
 }
 
-function getStatusBadgeUser($status) {
-    if($status == 'pending') {
-        return '<span class="badge-status pending"><i class="fas fa-clock"></i> Pending</span>';
-    } elseif($status == 'processing') {
-        return '<span class="badge-status processing"><i class="fas fa-cog"></i> Diproses</span>';
-    } elseif($status == 'completed') {
-        return '<span class="badge-status completed"><i class="fas fa-check-circle"></i> Selesai</span>';
-    } elseif($status == 'cancelled') {
-        return '<span class="badge-status cancelled"><i class="fas fa-times-circle"></i> Dibatalkan</span>';
-    } else {
-        return '<span class="badge-status pending"><i class="fas fa-clock"></i> Pending</span>';
-    }
-}
-
-function getPaymentBadgeUser($method) {
-    if($method == 'cod') {
-        return '<span class="badge-payment cod"><i class="fas fa-money-bill-wave"></i> COD (Bayar di Tempat)</span>';
-    } elseif($method == 'transfer') {
-        return '<span class="badge-payment transfer"><i class="fas fa-university"></i> Transfer Bank</span>';
-    } else {
-        return '<span class="badge-payment">' . $method . '</span>';
-    }
-}
-
-function getProgressStep($status) {
-    if($status == 'pending') {
-        return 1;
-    } elseif($status == 'processing') {
-        return 2;
-    } elseif($status == 'completed') {
-        return 3;
-    } elseif($status == 'cancelled') {
-        return 0;
-    } else {
-        return 1;
-    }
-}
+// Fungsi sentral dari inc/helpers.php
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -321,6 +287,7 @@ function getProgressStep($status) {
         </p>
         
         <form method="POST">
+            <?= csrfField() ?>
             <div class="row g-2">
                 <div class="col-10">
                     <input type="text" name="invoice" class="form-control form-control-lg" 

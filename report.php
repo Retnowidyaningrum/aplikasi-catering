@@ -1,41 +1,49 @@
 <?php
-session_start();
-if(!isset($_SESSION['login'])) header('Location: index.php');
 include 'config/database.php';
+if(!isset($_SESSION['login'])) header('Location: index.php');
 
 // ========== FILTER LAPORAN ==========
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
 $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
 
-// Query WHERE clause berdasarkan filter (TANPA ALIAS o.)
+// Build query with prepared statements
+$where = "1=1";
+$params = [];
+$title = "Semua Laporan";
+
 if($filter == 'daily') {
-    $where = "order_date = '$date'";
+    $where = "order_date = ?";
+    $params[] = $date;
     $title = "Laporan Harian - " . date('d/m/Y', strtotime($date));
 } elseif($filter == 'weekly') {
     $week_start = date('Y-m-d', strtotime('monday this week', strtotime($date)));
     $week_end = date('Y-m-d', strtotime('sunday this week', strtotime($date)));
-    $where = "order_date BETWEEN '$week_start' AND '$week_end'";
+    $where = "order_date BETWEEN ? AND ?";
+    $params[] = $week_start;
+    $params[] = $week_end;
     $title = "Laporan Mingguan - " . date('d/m/Y', strtotime($week_start)) . " s/d " . date('d/m/Y', strtotime($week_end));
 } elseif($filter == 'monthly') {
-    $where = "DATE_FORMAT(order_date, '%Y-%m') = '$month'";
+    $where = "DATE_FORMAT(order_date, '%Y-%m') = ?";
+    $params[] = $month;
     $title = "Laporan Bulanan - " . date('F Y', strtotime($month . '-01'));
-} else {
-    $where = "1=1";
-    $title = "Semua Laporan";
 }
 
-// Ambil data pesanan sesuai filter (TANPA ALIAS o.)
+// Ambil data pesanan sesuai filter (menggunakan prepared statement)
 $sql = "SELECT orders.*, customers.name as customer_name 
         FROM orders 
         LEFT JOIN customers ON orders.customer_id = customers.id 
         WHERE $where
         ORDER BY orders.order_date DESC";
-$orders = $db->query($sql)->fetchAll();
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
+$orders = $stmt->fetchAll();
 
-// Hitung total pendapatan (TANPA ALIAS)
+// Hitung total pendapatan (prepared statement)
 $sqlTotal = "SELECT COALESCE(SUM(total),0) FROM orders WHERE status='completed' AND $where";
-$total_revenue = $db->query($sqlTotal)->fetchColumn();
+$stmtTotal = $db->prepare($sqlTotal);
+$stmtTotal->execute($params);
+$total_revenue = $stmtTotal->fetchColumn();
 $total_orders = count($orders);
 ?>
 <!DOCTYPE html>
@@ -48,10 +56,7 @@ $total_orders = count($orders);
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        .badge-pending { background: #f39c12; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; }
-        .badge-processing { background: #3498db; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; }
-        .badge-completed { background: #27ae60; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; }
-        .badge-cancelled { background: #e74c3c; color: white; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; }
+
         
         .stats-card {
             background: white;
@@ -197,18 +202,7 @@ $total_orders = count($orders);
                                 <td><?= htmlspecialchars($o['customer_name']) ?></td>
                                 <td class="text-end text-success fw-bold"><?= rp($o['total']) ?></td>
                                 <td class="text-center">
-                                    <?php 
-                                    $status = $o['status'];
-                                    if($status == 'pending'): ?>
-                                        <span class="badge-pending">Pending</span>
-                                    <?php elseif($status == 'processing'): ?>
-                                        <span class="badge-processing">Diproses</span>
-                                    <?php elseif($status == 'completed'): ?>
-                                        <span class="badge-completed">Selesai</span>
-                                    <?php else: ?>
-                                        <span class="badge-cancelled">Dibatalkan</span>
-                                    <?php endif; ?>
-                                 </span>
+                                    <?= getStatusBadge($o['status']) ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>

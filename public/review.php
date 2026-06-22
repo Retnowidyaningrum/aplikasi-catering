@@ -35,6 +35,8 @@ if(isset($_GET['invoice'])) {
 }
 
 if(isset($_POST['submit_review']) && $order && !$sudah_review) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
+    
     $rating = $_POST['rating'];
     $comment = trim($_POST['comment']);
     
@@ -237,6 +239,7 @@ if(isset($_POST['submit_review']) && $order && !$sudah_review) {
                 <?php endif; ?>
                 
                 <form method="POST">
+                    <?= csrfField() ?>
                     <input type="hidden" name="order_id" value="<?= $order['id'] ?>">
                     
                     <div class="rating-container">

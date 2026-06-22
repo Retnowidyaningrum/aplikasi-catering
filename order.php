@@ -5,12 +5,14 @@ include 'config/database.php';
 
 // Update status
 if(isset($_GET['update'])) {
+    if (!isset($_GET['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_GET['csrf_token'])) { die('Token CSRF tidak valid!'); }
     $db->prepare("UPDATE orders SET status=? WHERE id=?")->execute([$_GET['status'], $_GET['id']]);
     echo "<script>alert('Status pesanan berhasil diupdate!'); location.href='order.php';</script>";
 }
 
 // HAPUS PESANAN
 if(isset($_GET['hapus'])) {
+    if (!isset($_GET['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_GET['csrf_token'])) { die('Token CSRF tidak valid!'); }
     $id = $_GET['hapus'];
     $db->prepare("DELETE FROM order_items WHERE order_id = ?")->execute([$id]);
     $db->prepare("DELETE FROM orders WHERE id = ?")->execute([$id]);
@@ -29,15 +31,7 @@ foreach($orders as &$order) {
     $order['items'] = $items->fetchAll();
 }
 
-function getPaymentBadge($method) {
-    if($method == 'cod') {
-        return '<span class="badge-payment cod"><i class="fas fa-money-bill-wave"></i> COD</span>';
-    } elseif($method == 'transfer') {
-        return '<span class="badge-payment transfer"><i class="fas fa-university"></i> Transfer</span>';
-    } else {
-        return '<span class="badge-payment">' . $method . '</span>';
-    }
-}
+// Fungsi sentral dari inc/helpers.php
 ?>
 <!DOCTYPE html>
 <html>
@@ -199,24 +193,16 @@ function getPaymentBadge($method) {
                                             <i class="fas fa-image"></i> Bukti
                                         </span>
                                     <?php endif; ?>
-                                 </span>
+                                </td>
                                 <td class="text-center">
-                                    <?php if($o['status'] == 'pending'): ?>
-                                        <span class="badge-pending">Pending</span>
-                                    <?php elseif($o['status'] == 'processing'): ?>
-                                        <span class="badge-processing">Diproses</span>
-                                    <?php elseif($o['status'] == 'completed'): ?>
-                                        <span class="badge-completed">Selesai</span>
-                                    <?php else: ?>
-                                        <span class="badge-cancelled">Dibatalkan</span>
-                                    <?php endif; ?>
-                                 </span>
+                                    <?= getStatusBadge($o['status']) ?>
+                                </td>
                                 <td class="text-center">
                                     <div class="action-buttons">
                                         <button class="btn-action btn-warning" onclick="editStatus(<?= $o['id'] ?>, '<?= $o['status'] ?>')" title="Edit Status">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <a href="?hapus=<?= $o['id'] ?>" class="btn-action btn-danger" onclick="return confirm('Hapus pesanan?')" title="Hapus Pesanan">
+                                        <a href="?hapus=<?= $o['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="btn-action btn-danger" onclick="return confirm('Hapus pesanan?')" title="Hapus Pesanan">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </div>
@@ -396,7 +382,7 @@ document.querySelectorAll('.btn-status').forEach(btn => {
         e.preventDefault();
         var newStatus = this.getAttribute('data-status');
         if(currentOrderId) {
-            window.location.href = '?update&id=' + currentOrderId + '&status=' + newStatus;
+            window.location.href = '?update&id=' + currentOrderId + '&status=' + newStatus + '&csrf_token=' + '<?= $_SESSION['csrf_token'] ?>';
         }
     });
 });

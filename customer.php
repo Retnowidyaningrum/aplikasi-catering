@@ -4,16 +4,19 @@ if(!isset($_SESSION['login'])) header('Location: index.php');
 include 'config/database.php';
 
 if(isset($_POST['tambah'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
     $db->prepare("INSERT INTO customers (name,phone,email,address) VALUES (?,?,?,?)")->execute([$_POST['name'],$_POST['phone'],$_POST['email'],$_POST['address']]);
     echo "<script>alert('Pelanggan ditambahkan!'); location.href='customer.php';</script>";
 }
 
 if(isset($_POST['edit'])) {
+    if (!verifyCsrfToken()) { die('Token CSRF tidak valid!'); }
     $db->prepare("UPDATE customers SET name=?, phone=?, email=?, address=? WHERE id=?")->execute([$_POST['name'],$_POST['phone'],$_POST['email'],$_POST['address'],$_POST['id']]);
     echo "<script>alert('Pelanggan diupdate!'); location.href='customer.php';</script>";
 }
 
 if(isset($_GET['hapus'])) {
+    if (!isset($_GET['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_GET['csrf_token'])) { die('Token CSRF tidak valid!'); }
     $db->prepare("DELETE FROM customers WHERE id=?")->execute([$_GET['hapus']]);
     echo "<script>alert('Pelanggan dihapus!'); location.href='customer.php';</script>";
 }
@@ -142,7 +145,7 @@ $customers = $db->query("SELECT * FROM customers ORDER BY id DESC")->fetchAll();
                                         )">
                                             <i class="fas fa-edit"></i> Edit
                                         </button>
-                                        <a href="?hapus=<?= $c['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus pelanggan <?= addslashes($c['name']) ?>?')">
+                                        <a href="?hapus=<?= $c['id'] ?>&csrf_token=<?= $_SESSION['csrf_token'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Yakin ingin menghapus pelanggan <?= addslashes($c['name']) ?>?')">
                                             <i class="fas fa-trash"></i> Hapus
                                         </a>
                                     </div>
@@ -172,6 +175,7 @@ $customers = $db->query("SELECT * FROM customers ORDER BY id DESC")->fetchAll();
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST">
+                <?= csrfField() ?>
                 <div class="modal-header" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white;">
                     <h5 class="modal-title"><i class="fas fa-user-plus"></i> Tambah Pelanggan</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -208,6 +212,7 @@ $customers = $db->query("SELECT * FROM customers ORDER BY id DESC")->fetchAll();
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST">
+                <?= csrfField() ?>
                 <input type="hidden" name="id" id="edit_id">
                 <div class="modal-header bg-warning">
                     <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Pelanggan</h5>
